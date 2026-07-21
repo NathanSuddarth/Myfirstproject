@@ -415,7 +415,7 @@ const UPGRADE_POOL = [
   { key:'bulletspeed', icon:'💨', name:'OVERDRIVE COILS', desc:'+25% projectile speed', apply:p=>p.bulletSpeedMult*=1.25 },
   { key:'turbodash', icon:'🏎️', name:'TURBO THRUSTERS', desc:'+25% dash speed, longer dash', apply:p=>{p.dashSpeed*=1.25;p.dashDuration+=40;} },
   { key:'precision', icon:'🔬', name:'PRECISION OPTICS', desc:'-50% multishot spread', apply:p=>p.spreadMult*=0.5 },
-  { key:'glasscannon', icon:'☠️', name:'GLASS CANNON MATRIX', desc:'+25% damage, -20 max integrity', apply:p=>{p.damage*=1.25;p.maxHp=Math.max(20,p.maxHp-20);p.hp=Math.min(p.hp,p.maxHp);} },
+  { key:'glasscannon', icon:'☠️', name:'GLASS CANNON MATRIX', desc:'+75% damage, -20 max integrity', apply:p=>{p.damage*=1.75;p.maxHp=Math.max(20,p.maxHp-20);p.hp=Math.min(p.hp,p.maxHp);} },
   { key:'revive', icon:'💾', name:'EMERGENCY REBOOT', desc:'Revive once at 50% integrity when destroyed', apply:p=>p.hasRevive=true },
   { key:'homing', icon:'🧲', name:'TARGETING AI', desc:'Shots steer toward the nearest enemy', apply:p=>p.homingTurn+=2.5 },
   { key:'medkit', icon:'🩹', name:'REPAIR SURGE', desc:'Restore 50% of missing integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+(p.maxHp-p.hp)*0.5) },
