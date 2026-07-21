@@ -415,7 +415,7 @@ function makeEnemy(type, sector){
 const UPGRADE_POOL = [
   { key:'damage', icon:'💥', name:'OVERCHARGE ROUNDS', desc:'+35% weapon damage', apply:p=>p.damage*=1.35 },
   { key:'firerate', icon:'⚡', name:'RAPID CYCLER', desc:'-20% shot cooldown', apply:p=>p.fireCooldown*=0.8 },
-  { key:'maxhp', icon:'🛡️', name:'REINFORCED PLATING', desc:'+30 max integrity, full repair', apply:p=>{p.maxHp+=30;p.hp=p.maxHp;} },
+  { key:'maxhp', icon:'🛡️', name:'REINFORCED PLATING', desc:'+100 max integrity first time, +15% each time after', apply:p=>{const gain=p.upgrades.includes('REINFORCED PLATING')?p.maxHp*0.15:100;p.maxHp+=gain;p.hp=Math.min(p.maxHp,p.hp+gain);} },
   { key:'speed', icon:'🚀', name:'SERVO BOOST', desc:'+18% movement speed', apply:p=>p.speed*=1.18 },
   { key:'multishot', icon:'✴️', name:'TWIN EMITTER', desc:'+1 projectile per shot', apply:p=>p.multishot+=1 },
   { key:'dash', icon:'🌀', name:'CAPACITOR TUNING', desc:'-25% dash cooldown', apply:p=>p.dashCooldown*=0.75 },
@@ -972,16 +972,57 @@ function drawPlayer(t){
   // weapon arm
   ctx.save();
   ctx.rotate(ang);
-  ctx.fillStyle = '#0f2833';
-  ctx.fillRect(r*0.1, -r*0.14, r*1.1, r*0.28);
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(r*0.3,-r*0.14); ctx.lineTo(r*0.3,r*0.14); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(r*0.55,-r*0.14); ctx.lineTo(r*0.55,r*0.14); ctx.stroke();
+
+  // shoulder mount
+  ctx.fillStyle = '#0a2028';
+  roundRect(ctx, -r*0.02, -r*0.2, r*0.22, r*0.4, r*0.06); ctx.fill();
+
+  // main barrel housing
+  const barrelGrad = ctx.createLinearGradient(0,-r*0.14,0,r*0.14);
+  barrelGrad.addColorStop(0, '#1c4657');
+  barrelGrad.addColorStop(0.5, '#0f2833');
+  barrelGrad.addColorStop(1, '#081a21');
+  ctx.fillStyle = barrelGrad;
+  ctx.fillRect(r*0.1, -r*0.14, r*1.0, r*0.28);
+  ctx.strokeStyle = '#04121a'; ctx.lineWidth = 1;
+  ctx.strokeRect(r*0.1, -r*0.14, r*1.0, r*0.28);
+
+  // cooling fins
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+  for (let fx = r*0.28; fx < r*0.95; fx += r*0.13){
+    ctx.beginPath(); ctx.moveTo(fx,-r*0.14); ctx.lineTo(fx,r*0.14); ctx.stroke();
+  }
+
+  // energy conduit that brightens as the weapon nears ready-to-fire
+  const readiness = clamp((t - player.lastShot) / player.fireCooldown, 0, 1);
+  ctx.strokeStyle = `rgba(93,255,224,${0.25+readiness*0.6})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(r*0.15,0); ctx.lineTo(r*1.02,0); ctx.stroke();
+
+  // slung ammo cell
+  ctx.fillStyle = '#12333f';
+  roundRect(ctx, r*0.32, r*0.1, r*0.28, r*0.22, r*0.04); ctx.fill();
+  ctx.strokeStyle = '#04121a'; ctx.lineWidth = 1;
+  roundRect(ctx, r*0.32, r*0.1, r*0.28, r*0.22, r*0.04); ctx.stroke();
+  ctx.fillStyle = Math.sin(t/180) > 0 ? '#5dffe0' : '#175c52';
+  ctx.beginPath(); ctx.arc(r*0.46, r*0.21, r*0.06, 0, Math.PI*2); ctx.fill();
+
+  // front sight rail
+  ctx.fillStyle = '#0a2028';
+  ctx.fillRect(r*0.55, -r*0.26, r*0.08, r*0.12);
+
+  // muzzle brake with concentric bore rings
   ctx.fillStyle = '#1a3d4d';
   ctx.fillRect(r*1.0, -r*0.18, r*0.25, r*0.36);
-  ctx.fillStyle = Math.sin(t/180) > 0 ? '#5dffe0' : '#175c52';
-  ctx.beginPath(); ctx.arc(r*0.18, 0, r*0.07, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#04121a'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(r*1.12,0,r*0.14,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(r*1.12,0,r*0.07,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#04121a';
+  ctx.beginPath(); ctx.arc(r*1.2,0,r*0.05,0,Math.PI*2); ctx.fill();
+
   if (t - player.lastShot < 60){
+    ctx.fillStyle = 'rgba(160,255,240,0.5)';
+    ctx.beginPath(); ctx.arc(r*1.3, 0, r*0.5, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.beginPath(); ctx.arc(r*1.3, 0, r*0.3, 0, Math.PI*2); ctx.fill();
   }
