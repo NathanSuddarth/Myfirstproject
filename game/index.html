@@ -9,10 +9,23 @@
     background:#05070a; height:100%; overflow:hidden;
     font-family:'Consolas','Courier New',monospace; color:#9fe8ff;
   }
-  #wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; }
-  canvas { background:#0a0e14; border:2px solid #1f3a4a; box-shadow:0 0 40px #0af6, inset 0 0 60px #0004; }
+  #wrap {
+    position:fixed; inset:0; width:100vw; height:100vh;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #stage {
+    position:relative; display:flex; align-items:center; justify-content:center;
+    width:100%; height:100%;
+    perspective:1300px; perspective-origin:50% 12%;
+  }
+  canvas {
+    display:block; background:#0a0e14;
+    transform-origin:50% 100%;
+    transform:rotateX(42deg) scale(1.55);
+    box-shadow:0 0 120px 40px #05070a;
+  }
   #overlay {
-    position:absolute; top:0; left:0; width:900px; height:600px;
+    position:absolute; top:0; left:0; width:100%; height:100%;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; pointer-events:none; color:#bff3ff; overflow:auto;
   }
@@ -46,7 +59,7 @@
 </head>
 <body>
 <div id="wrap">
-  <div style="position:relative;">
+  <div id="stage">
     <canvas id="c" width="900" height="600"></canvas>
     <div id="hud">
       <div>
@@ -70,7 +83,7 @@
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
+let W = canvas.width, H = canvas.height;
 const overlay = document.getElementById('overlay');
 const hpBarInner = document.getElementById('hpBarInner');
 const dashBarInner = document.getElementById('dashBarInner');
@@ -86,9 +99,10 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 canvas.addEventListener('mousemove', e => {
-  const r = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - r.left;
-  mouse.y = e.clientY - r.top;
+  // offsetX/offsetY are hit-tested in the canvas's own local box, so they stay
+  // correct even though the canvas is now tilted in 3D via CSS transform.
+  mouse.x = e.offsetX * (canvas.width / canvas.clientWidth);
+  mouse.y = e.offsetY * (canvas.height / canvas.clientHeight);
 });
 canvas.addEventListener('mousedown', () => mouse.down = true);
 canvas.addEventListener('mouseup', () => mouse.down = false);
@@ -1382,6 +1396,15 @@ function loop(ts){
   draw(ts);
   requestAnimationFrame(loop);
 }
+
+function resizeStage(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  W = canvas.width;
+  H = canvas.height;
+}
+window.addEventListener('resize', resizeStage);
+resizeStage();
 
 resetRun();
 requestAnimationFrame(loop);
