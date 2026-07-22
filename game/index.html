@@ -44,10 +44,21 @@
     position:absolute; top:16px; left:16px; right:16px; display:flex; justify-content:space-between;
     font-size:13px; pointer-events:none; text-shadow:0 0 6px #000;
   }
+  #hpBarRow { display:flex; align-items:center; gap:8px; }
   #hpBarOuter, #dashBarOuter { width:220px; height:14px; border:1px solid #2ce8ff; background:#04121a; margin-top:4px; }
   #hpBarInner { height:100%; background:linear-gradient(90deg,#ff3050,#ff8a3d); width:100%; }
   #dashBarInner { height:100%; background:linear-gradient(90deg,#2ce8ff,#7fffb0); width:100%; }
+  #hpText { font-size:12px; color:#ffd9d9; white-space:nowrap; margin-top:4px; }
   #upgradeList { font-size:12px; color:#8fe; text-align:right; max-width:260px; line-height:1.5; }
+  #abilityRow { display:flex; gap:10px; margin-top:8px; }
+  #abilityRow .abilityLabel { font-size:11px; letter-spacing:0.5px; }
+  .abilityBarOuter { width:74px; height:10px; border:1px solid #2ce8ff; background:#04121a; margin-top:2px; }
+  .abilityBarOuter.locked { border-color:#4a5560; opacity:0.5; }
+  .abilityLabel.locked { color:#6a7580; }
+  .abilityBarInner { height:100%; width:100%; }
+  #novaBarInner { background:linear-gradient(90deg,#5dffe0,#2ce8ff); }
+  #shieldBarInner { background:linear-gradient(90deg,#5dffe0,#7fffb0); }
+  #surgeBarInner { background:linear-gradient(90deg,#ffe15d,#ff8a3d); }
 </style>
 </head>
 <body>
@@ -57,9 +68,26 @@
     <div id="hud">
       <div>
         <div>UNIT-7 // INTEGRITY</div>
-        <div id="hpBarOuter"><div id="hpBarInner"></div></div>
+        <div id="hpBarRow">
+          <div id="hpBarOuter"><div id="hpBarInner"></div></div>
+          <div id="hpText">300 / 300</div>
+        </div>
         <div style="margin-top:6px;">DASH</div>
         <div id="dashBarOuter"><div id="dashBarInner"></div></div>
+        <div id="abilityRow">
+          <div>
+            <div id="novaLabel" class="abilityLabel">[Z] NOVA — LOCKED</div>
+            <div id="novaBarOuter" class="abilityBarOuter locked"><div id="novaBarInner" class="abilityBarInner"></div></div>
+          </div>
+          <div>
+            <div id="shieldLabel" class="abilityLabel">[X] SHIELD — LOCKED</div>
+            <div id="shieldBarOuter" class="abilityBarOuter locked"><div id="shieldBarInner" class="abilityBarInner"></div></div>
+          </div>
+          <div>
+            <div id="surgeLabel" class="abilityLabel">[C] SURGE — LOCKED</div>
+            <div id="surgeBarOuter" class="abilityBarOuter locked"><div id="surgeBarInner" class="abilityBarInner"></div></div>
+          </div>
+        </div>
       </div>
       <div style="text-align:right;">
         <div id="floorLabel">SECTOR 1</div>
@@ -84,7 +112,17 @@ const TILT_SCALE = 1;
 function sideMargin(){ return W * (1 - 1/TILT_SCALE) / 2; }
 const overlay = document.getElementById('overlay');
 const hpBarInner = document.getElementById('hpBarInner');
+const hpText = document.getElementById('hpText');
 const dashBarInner = document.getElementById('dashBarInner');
+const novaBarInner = document.getElementById('novaBarInner');
+const shieldBarInner = document.getElementById('shieldBarInner');
+const surgeBarInner = document.getElementById('surgeBarInner');
+const novaBarOuter = document.getElementById('novaBarOuter');
+const shieldBarOuter = document.getElementById('shieldBarOuter');
+const surgeBarOuter = document.getElementById('surgeBarOuter');
+const novaLabel = document.getElementById('novaLabel');
+const shieldLabel = document.getElementById('shieldLabel');
+const surgeLabel = document.getElementById('surgeLabel');
 const floorLabel = document.getElementById('floorLabel');
 const upgradeListEl = document.getElementById('upgradeList');
 
@@ -202,6 +240,13 @@ const Audio8 = (function(){
     explosion(){ if (sfxOn){ noiseBurst(0.35, 0.28, 1200, sfxGain); tone(180, 0.3, 'square', 0.16, sfxGain, undefined, 40); } },
     playerHurt(){ if (sfxOn) tone(140, 0.18, 'sawtooth', 0.22, sfxGain, undefined, 60); },
     dash(){ if (sfxOn) tone(300, 0.15, 'square', 0.16, sfxGain, undefined, 900); },
+    nova(){ if (sfxOn){ noiseBurst(0.3, 0.24, 2000, sfxGain); tone(220, 0.3, 'sawtooth', 0.2, sfxGain, undefined, 880); } },
+    shield(){ if (sfxOn) tone(500, 0.25, 'sine', 0.2, sfxGain, undefined, 900); },
+    surge(){
+      if (!sfxOn) return;
+      const c = ensureCtx(), t0 = c.currentTime;
+      [440,660,880].forEach((f,i)=> tone(f, 0.1, 'square', 0.16, sfxGain, t0+i*0.05));
+    },
     upgrade(){
       if (!sfxOn) return;
       const c = ensureCtx(), t0 = c.currentTime;
@@ -247,6 +292,60 @@ const Audio8 = (function(){
 
 // ---------- game state ----------
 const BOSS_INTERVAL = 10;
+// each tier corresponds to a boss encounter 10 sectors apart (round 10, 20, 30, 40, 50...);
+// tier repeats via modulo once a run goes past round 50
+const WARDEN_PALETTES = [
+  { // tier 1 (round 10) — crimson
+    track:'rgba(90,15,34,0.8)', trackLit:'rgba(255,120,150,0.25)',
+    blade:'#4a0c1d', bladeEdge:'rgba(255,110,140,0.35)',
+    core0:'#b23a52', core1:'#7a1830', core2:'#40091a', core3:'#1c030c',
+    coreOutline:'rgba(10,2,6,0.85)', seam:'rgba(20,4,10,0.6)',
+    conduitGlow:'#ff3050', conduitStroke:'rgba(255,90,120,0.55)',
+    podGlow:'#ff5d78',
+    iris1:'#ffb3c0', iris2:'#ff1f45', iris3:'#5a0716', eyeGlow:'#ff1f45',
+    bullet:'#ff1f45'
+  },
+  { // tier 2 (round 20) — violet plague
+    track:'rgba(80,20,110,0.8)', trackLit:'rgba(200,120,255,0.25)',
+    blade:'#3a0c4a', bladeEdge:'rgba(210,110,255,0.35)',
+    core0:'#9a3ab2', core1:'#63187a', core2:'#330940', core3:'#15031c',
+    coreOutline:'rgba(8,2,10,0.85)', seam:'rgba(16,4,20,0.6)',
+    conduitGlow:'#b030ff', conduitStroke:'rgba(200,90,255,0.55)',
+    podGlow:'#c15dff',
+    iris1:'#d9b3ff', iris2:'#b01fff', iris3:'#360a5a', eyeGlow:'#b01fff',
+    bullet:'#c11fff'
+  },
+  { // tier 3 (round 30) — cyan storm
+    track:'rgba(15,60,90,0.8)', trackLit:'rgba(120,220,255,0.25)',
+    blade:'#0c3a4a', bladeEdge:'rgba(110,220,255,0.35)',
+    core0:'#3a9ab2', core1:'#18637a', core2:'#093340', core3:'#03151c',
+    coreOutline:'rgba(2,8,10,0.85)', seam:'rgba(4,16,20,0.6)',
+    conduitGlow:'#30d0ff', conduitStroke:'rgba(90,200,255,0.55)',
+    podGlow:'#5dd8ff',
+    iris1:'#b3ecff', iris2:'#1fb0ff', iris3:'#0a4a5a', eyeGlow:'#1fb0ff',
+    bullet:'#1fc8ff'
+  },
+  { // tier 4 (round 40) — acid green
+    track:'rgba(30,80,15,0.8)', trackLit:'rgba(160,255,110,0.25)',
+    blade:'#1c4a0c', bladeEdge:'rgba(150,255,110,0.35)',
+    core0:'#6ab23a', core1:'#3f7a18', core2:'#1e4009', core3:'#0c1c03',
+    coreOutline:'rgba(4,10,2,0.85)', seam:'rgba(8,20,4,0.6)',
+    conduitGlow:'#7dff30', conduitStroke:'rgba(150,255,90,0.55)',
+    podGlow:'#a0ff5d',
+    iris1:'#d4ffb3', iris2:'#66ff1f', iris3:'#1c5a0a', eyeGlow:'#66ff1f',
+    bullet:'#7dff2f'
+  },
+  { // tier 5 (round 50) — molten gold
+    track:'rgba(110,70,10,0.8)', trackLit:'rgba(255,210,120,0.25)',
+    blade:'#4a300c', bladeEdge:'rgba(255,210,110,0.35)',
+    core0:'#b28a3a', core1:'#7a5c18', core2:'#402d09', core3:'#1c1303',
+    coreOutline:'rgba(10,8,2,0.85)', seam:'rgba(20,16,4,0.6)',
+    conduitGlow:'#ffbe30', conduitStroke:'rgba(255,200,90,0.55)',
+    podGlow:'#ffd05d',
+    iris1:'#ffe8b3', iris2:'#ff9a1f', iris3:'#5a380a', eyeGlow:'#ff9a1f',
+    bullet:'#ffb020'
+  },
+];
 let state = {
   mode: 'title', // title, story, playing, upgrade, gameover
   sector: 1,
@@ -262,14 +361,18 @@ function makePlayer(){
   return {
     x: W/2, y: H/2, radius: 22.5,
     speed: 230,
-    hp: 100, maxHp: 100,
+    hp: 300, maxHp: 300,
     damage: 12,
+    damageTaken: 0,
     fireCooldown: 260, lastShot: -9999,
     multishot: 1,
     pierce: 0,
     armor: 0,
     dashSpeed: 780, dashDuration: 140, dashCooldown: 1600,
     dashTimer: 0, dashCooldownTimer: 0,
+    novaCooldown: 8000, novaCooldownTimer: 0, novaBurstTimer: 0, novaUnlocked: false, novaDamageMult: 9,
+    shieldCooldown: 12000, shieldCooldownTimer: 0, shieldDuration: 1500, shieldTimer: 0, shieldUnlocked: false,
+    surgeCooldown: 14000, surgeCooldownTimer: 0, surgeDuration: 5000, surgeTimer: 0, surgeUnlocked: false, surgePotency: 1,
     invuln: 0,
     facing: 0,
     animT: 0,
@@ -371,12 +474,15 @@ function spawnRoom(sector){
   enemies = [];
   if (isBossSector(sector)){
     const bossIndex = sector / BOSS_INTERVAL;
-    const bossScale = 1 + (bossIndex-1)*0.55;
+    const bossScale = 1 + enemyHealthScaleSum(sector);
+    const tier = Math.min(bossIndex, WARDEN_PALETTES.length);
+    const palette = WARDEN_PALETTES[(bossIndex-1) % WARDEN_PALETTES.length];
     enemies.push({
       type:'boss', x: W/2, y: 130, radius: 57.5,
       hp: 990*bossScale, maxHp: 990*bossScale,
       speed: 60 + (bossIndex-1)*6, lastShot: -9999, shootCooldown: Math.max(450, 900-(bossIndex-1)*40),
       phaseTimer: 0, spawnCooldown: Math.max(2200, 4200-(bossIndex-1)*200), lastSpawn: -9999,
+      tier, palette, attackCycle: 0,
       color:'#ff2d55'
     });
     return;
@@ -400,6 +506,18 @@ function enemyHealthScale(sector){
     scale *= (1 + rate);
   }
   return scale;
+}
+
+// sum (rather than compound) of every round's health-scaling bonus, so a warden
+// carries the combined weight of all the bonuses regular enemies picked up to get here:
+// e.g. by round 10 it's ten 10% bonuses, by round 20 it's ten 10% bonuses plus ten 20% bonuses
+function enemyHealthScaleSum(sector){
+  let sum = 0;
+  for (let i=1; i<=sector; i++){
+    const decade = Math.floor((i-1)/10);
+    sum += 0.10 * Math.pow(2, decade);
+  }
+  return sum;
 }
 
 function enemyDamageScale(sector){
@@ -428,7 +546,7 @@ function makeEnemy(type, sector){
 const UPGRADE_POOL = [
   { key:'damage', cat:'offense', name:'OVERCHARGE ROUNDS', desc:'+35% weapon damage', apply:p=>p.damage*=1.35 },
   { key:'firerate', cat:'offense', name:'RAPID CYCLER', desc:'-20% shot cooldown', apply:p=>p.fireCooldown*=0.8 },
-  { key:'maxhp', cat:'defense', name:'REINFORCED PLATING', desc:'+100 max integrity first time, +15% each time after', apply:p=>{const gain=p.upgrades.includes('REINFORCED PLATING')?p.maxHp*0.15:100;p.maxHp+=gain;p.hp=Math.min(p.maxHp,p.hp+gain);} },
+  { key:'maxhp', cat:'defense', name:'REINFORCED PLATING', desc:'+200 max integrity first time, +50% each time after', apply:p=>{const gain=p.upgrades.includes('REINFORCED PLATING')?p.maxHp*0.5:200;p.maxHp+=gain;p.hp=Math.min(p.maxHp,p.hp+gain);} },
   { key:'speed', cat:'utility', name:'SERVO BOOST', desc:'+18% movement speed', apply:p=>p.speed*=1.18 },
   { key:'multishot', cat:'offense', name:'TWIN EMITTER', desc:'+50% projectile count (rounded up)', apply:p=>p.multishot=Math.ceil(p.multishot*1.5) },
   { key:'dash', cat:'utility', name:'CAPACITOR TUNING', desc:'-25% dash cooldown', apply:p=>p.dashCooldown*=0.75 },
@@ -446,6 +564,9 @@ const UPGRADE_POOL = [
   { key:'revive', cat:'defense', name:'EMERGENCY REBOOT', desc:'Revive once at 50% integrity when destroyed', apply:p=>p.hasRevive=true },
   { key:'homing', cat:'offense', name:'TARGETING AI', desc:'Shots steer toward the nearest enemy, turn rate +50% multiplicatively each time after first', apply:p=>{p.homingTurn=p.upgrades.includes('TARGETING AI')?p.homingTurn*1.5:2.5/3;} },
   { key:'medkit', cat:'defense', name:'REPAIR SURGE', desc:'Restore 50% of missing integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+(p.maxHp-p.hp)*0.5) },
+  { key:'unlock_nova', cat:'offense', name:'OVERLOAD MODULE', desc:'Unlocks [Z] NOVA — AOE burst around you; +50% nova damage each time after', apply:p=>{if(!p.novaUnlocked)p.novaUnlocked=true; else p.novaDamageMult*=1.5;} },
+  { key:'unlock_shield', cat:'defense', name:'PHASE EMITTER', desc:'Unlocks [X] SHIELD — brief invulnerability; +50% shield uptime each time after', apply:p=>{if(!p.shieldUnlocked)p.shieldUnlocked=true; else p.shieldDuration*=1.5;} },
+  { key:'unlock_surge', cat:'utility', name:'ADRENAL IMPLANT', desc:'Unlocks [C] SURGE — temporary fire rate, damage and speed boost; +50% potency and uptime each time after', apply:p=>{if(!p.surgeUnlocked)p.surgeUnlocked=true; else {p.surgePotency*=1.5; p.surgeDuration*=1.5;}} },
 ];
 
 function offerUpgrades(){
@@ -763,13 +884,16 @@ function updateUpgradeList(){
 // ---------- shooting ----------
 function tryPlayerShoot(t){
   if (!mouse.down) return;
-  if (t - player.lastShot < player.fireCooldown) return;
+  const surging = player.surgeTimer > 0;
+  const cooldown = player.fireCooldown / (surging ? (1 + 0.5*player.surgePotency) : 1);
+  if (t - player.lastShot < cooldown) return;
   player.lastShot = t;
   Audio8.sfx.playerShoot();
   const baseAng = Math.atan2(mouse.y-player.y, mouse.x-player.x);
   const spread = 0.12 * player.spreadMult;
   const n = player.multishot;
   const speed = 620 * player.bulletSpeedMult;
+  const dmgMult = rageDamageMult(player) * (surging ? (1 + 0.25*player.surgePotency) : 1);
   for (let i=0;i<n;i++){
     const off = (i - (n-1)/2) * spread;
     const ang = baseAng + off;
@@ -778,7 +902,7 @@ function tryPlayerShoot(t){
       x: player.x + Math.cos(ang)*player.radius,
       y: player.y + Math.sin(ang)*player.radius,
       vx: Math.cos(ang)*speed, vy: Math.sin(ang)*speed,
-      radius: 4, damage: isCrit ? player.damage*player.critMult : player.damage,
+      radius: 4, damage: (isCrit ? player.damage*player.critMult : player.damage) * dmgMult,
       pierceLeft: player.pierce, bounces: player.ricochet, crit: isCrit,
     });
   }
@@ -788,23 +912,63 @@ function enemyShoot(e, t){
   const ang = Math.atan2(player.y-e.y, player.x-e.x);
   const dmgScale = enemyDamageScale(state.sector);
   if (e.type === 'soldier'){
-    enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(ang)*300, vy:Math.sin(ang)*300, radius:5, damage:8*dmgScale, homing:false, kind:'soldier'});
+    enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(ang)*300, vy:Math.sin(ang)*300, radius:5, damage:16*dmgScale, homing:false, kind:'soldier'});
     Audio8.sfx.soldierShoot();
   } else if (e.type === 'tank'){
     for (let d=-0.22; d<=0.22; d+=0.22){
       const a = ang+d;
-      enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*260, vy:Math.sin(a)*260, radius:6, damage:12*dmgScale, homing:false, kind:'tank'});
+      enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*260, vy:Math.sin(a)*260, radius:6, damage:24*dmgScale, homing:false, kind:'tank'});
     }
     Audio8.sfx.tankShoot();
   } else if (e.type === 'turret'){
-    enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(ang)*160, vy:Math.sin(ang)*160, radius:6, damage:16*dmgScale, homing:true, turn:2.4, life:4000, kind:'turret'});
+    enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(ang)*160, vy:Math.sin(ang)*160, radius:6, damage:32*dmgScale, homing:true, turn:2.4, life:4000, kind:'turret'});
     Audio8.sfx.turretLaunch();
   } else if (e.type === 'boss'){
-    const bulletCount = 20;
-    const spin = (t/900) % (Math.PI*2);
-    for (let i=0; i<bulletCount; i++){
-      const a = spin + i*(Math.PI*2/bulletCount);
-      enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*230, vy:Math.sin(a)*230, radius:6, damage:14*dmgScale, homing:false, kind:'boss'});
+    const tier = e.tier || 1;
+    const bc = (e.palette && e.palette.bullet) || '#ff1f45';
+    e.attackCycle = (e.attackCycle||0) + 1;
+    const pattern = (e.attackCycle-1) % tier;
+    if (pattern === 0){
+      // signature attack of THE WARDEN (round 10+): full 360 radial burst
+      const bulletCount = 20;
+      const spin = (t/900) % (Math.PI*2);
+      for (let i=0; i<bulletCount; i++){
+        const a = spin + i*(Math.PI*2/bulletCount);
+        enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*230, vy:Math.sin(a)*230, radius:6, damage:28*dmgScale, homing:false, kind:'boss', color:bc});
+      }
+    } else if (pattern === 1){
+      // signature attack of THE WARDEN II (round 20+): twin counter-spinning rings
+      for (let ring=0; ring<2; ring++){
+        const count = 10;
+        const dir = ring===0 ? 1 : -1;
+        const spin = dir * (t/700) % (Math.PI*2);
+        const speed = ring===0 ? 190 : 260;
+        for (let i=0; i<count; i++){
+          const a = spin + i*(Math.PI*2/count);
+          enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*speed, vy:Math.sin(a)*speed, radius:6, damage:24*dmgScale, homing:false, kind:'boss', color:bc});
+        }
+      }
+    } else if (pattern === 2){
+      // signature attack of THE WARDEN III (round 30+): fast aimed tri-burst
+      for (let d=-0.26; d<=0.26; d+=0.26){
+        const a = ang+d;
+        enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*340, vy:Math.sin(a)*340, radius:7, damage:36*dmgScale, homing:false, kind:'boss', color:bc});
+      }
+    } else if (pattern === 3){
+      // signature attack of THE WARDEN IV (round 40+): homing missile salvo
+      for (let i=0; i<3; i++){
+        const a = ang + (i-1)*0.5;
+        enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*150, vy:Math.sin(a)*150, radius:6, damage:32*dmgScale, homing:true, turn:2.0, life:5000, kind:'boss', color:bc});
+      }
+    } else if (pattern === 4){
+      // signature attack of THE WARDEN V (round 50+): descending bullet wall with a dodge gap
+      const m = sideMargin();
+      const gapCenter = rand(m+70, W-m-70);
+      const gapWidth = 140;
+      for (let x = m+20; x < W-m-20; x += 36){
+        if (Math.abs(x-gapCenter) < gapWidth/2) continue;
+        enemyBullets.push({x, y:60, vx:0, vy:210, radius:7, damage:32*dmgScale, homing:false, kind:'boss', color:bc});
+      }
     }
     Audio8.sfx.bossShoot();
   }
@@ -825,6 +989,22 @@ function spawnExplosion(x,y,color){
       life:480, maxLife:480, color: Math.random()<0.4?'#fff':color, r:rand(2,5)
     });
   }
+}
+
+// ---------- active abilities (Z / X / C) ----------
+const NOVA_RADIUS = 260;
+const NOVA_BURST_DURATION = 300;
+function triggerNova(){
+  const dmg = player.damage * player.novaDamageMult;
+  for (const e of enemies){
+    if (dist(player,e) < NOVA_RADIUS + e.radius){
+      e.hp -= dmg;
+      spawnHit(e.x, e.y, e.color||'#fff');
+    }
+  }
+  spawnExplosion(player.x, player.y, '#5dffe0');
+  player.novaBurstTimer = NOVA_BURST_DURATION;
+  Audio8.sfx.nova();
 }
 
 function update(dt, t){
@@ -851,8 +1031,9 @@ function update(dt, t){
     player.x += mx * (player.dashSpeed) * (dt/1000);
     player.y += my * (player.dashSpeed) * (dt/1000);
   } else {
-    player.x += mx * player.speed * (dt/1000);
-    player.y += my * player.speed * (dt/1000);
+    const moveSpeed = player.speed * (player.surgeTimer > 0 ? (1 + 0.3*player.surgePotency) : 1);
+    player.x += mx * moveSpeed * (dt/1000);
+    player.y += my * moveSpeed * (dt/1000);
     if (keys[' '] && player.dashCooldownTimer <= 0 && mlen>0){
       player.dashTimer = player.dashDuration;
       player.dashCooldownTimer = player.dashCooldown;
@@ -861,6 +1042,32 @@ function update(dt, t){
     }
   }
   player.dashCooldownTimer = Math.max(0, player.dashCooldownTimer - dt);
+
+  // active abilities: Z nova burst, X phase shield, C adrenaline surge — each locked until its upgrade card is picked
+  if (player.novaUnlocked && keys['z'] && player.novaCooldownTimer <= 0){
+    player.novaCooldownTimer = player.novaCooldown;
+    triggerNova();
+  }
+  player.novaCooldownTimer = Math.max(0, player.novaCooldownTimer - dt);
+  player.novaBurstTimer = Math.max(0, player.novaBurstTimer - dt);
+
+  if (player.shieldUnlocked && keys['x'] && player.shieldCooldownTimer <= 0){
+    player.shieldCooldownTimer = player.shieldCooldown;
+    player.shieldTimer = player.shieldDuration;
+    player.invuln = Math.max(player.invuln, player.shieldDuration);
+    Audio8.sfx.shield();
+  }
+  player.shieldCooldownTimer = Math.max(0, player.shieldCooldownTimer - dt);
+  player.shieldTimer = Math.max(0, player.shieldTimer - dt);
+
+  if (player.surgeUnlocked && keys['c'] && player.surgeCooldownTimer <= 0){
+    player.surgeCooldownTimer = player.surgeCooldown;
+    player.surgeTimer = player.surgeDuration;
+    Audio8.sfx.surge();
+  }
+  player.surgeCooldownTimer = Math.max(0, player.surgeCooldownTimer - dt);
+  player.surgeTimer = Math.max(0, player.surgeTimer - dt);
+
   player.invuln = Math.max(0, player.invuln - dt);
   const m = sideMargin();
   player.x = clamp(player.x, m+player.radius, W-m-player.radius);
@@ -981,7 +1188,7 @@ function update(dt, t){
     }
     for (const e of enemies){
       if (dist(e,player) < e.radius+player.radius+4){
-        const contactBase = e.type==='tank'?18:(e.type==='boss'?26:10);
+        const contactBase = e.type==='tank'?36:(e.type==='boss'?52:20);
         applyDamage(contactBase * enemyDamageScale(state.sector));
         break;
       }
@@ -1011,8 +1218,16 @@ function update(dt, t){
 function applyDamage(dmg){
   const reduced = dmg * (1-(player.armor||0));
   player.hp -= reduced;
+  player.damageTaken = (player.damageTaken||0) + reduced;
   player.invuln = 420;
   Audio8.sfx.playerHurt();
+}
+
+const RAGE_THRESHOLD = 1000;
+function isRaging(p){ return (p.damageTaken||0) >= RAGE_THRESHOLD; }
+function rageDamageMult(p){
+  if (!isRaging(p)) return 1;
+  return 1.25 + (p.damageTaken - RAGE_THRESHOLD) * 0.0005; // +25% on trigger, +5% per further 100 integrity lost
 }
 
 function triggerGameOver(){
@@ -1329,6 +1544,7 @@ function drawPlayer(t){
   const ang = Math.atan2(mouse.y-player.y, mouse.x-player.x);
   const r = player.radius;
   const flashing = player.invuln > 0 && Math.floor(player.invuln/80)%2===0;
+  const raging = isRaging(player);
   const OUTLINE = '#0a0a14';
   ctx.save();
   ctx.translate(player.x, player.y);
@@ -1369,9 +1585,9 @@ function drawPlayer(t){
   ctx.rotate(ang);
   [-1,1].forEach(side=>{
     const sg = ctx.createRadialGradient(-r*0.16, side*r*0.76, r*0.04, -r*0.05, side*r*0.82, r*0.42);
-    sg.addColorStop(0, flashing ? '#ffffff' : '#7da26b');
-    sg.addColorStop(0.55, flashing ? '#ffffff' : '#41693f');
-    sg.addColorStop(1, flashing ? '#ffffff' : '#1c2f1a');
+    sg.addColorStop(0, flashing ? '#ffffff' : raging ? '#ff8f7d' : '#7da26b');
+    sg.addColorStop(0.55, flashing ? '#ffffff' : raging ? '#c23a2f' : '#41693f');
+    sg.addColorStop(1, flashing ? '#ffffff' : raging ? '#4a0f0c' : '#1c2f1a');
     ctx.fillStyle = sg;
     ctx.beginPath(); ctx.ellipse(-r*0.05, side*r*0.82, r*0.34, r*0.2, 0,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle = 'rgba(8,12,8,0.6)'; ctx.lineWidth = 1.2; ctx.stroke();
@@ -1382,10 +1598,10 @@ function drawPlayer(t){
 
   // hull: weathered green alloy dome lit from the upper-left
   const hull = ctx.createRadialGradient(-r*0.38,-r*0.42, r*0.08, r*0.05, r*0.08, r*1.18);
-  hull.addColorStop(0, flashing ? '#ffffff' : '#c9edb4');
-  hull.addColorStop(0.3, flashing ? '#ffffff' : '#7cc26a');
-  hull.addColorStop(0.65, flashing ? '#ffffff' : '#3f8a44');
-  hull.addColorStop(1, flashing ? '#ffffff' : '#15311c');
+  hull.addColorStop(0, flashing ? '#ffffff' : raging ? '#ffd4b8' : '#c9edb4');
+  hull.addColorStop(0.3, flashing ? '#ffffff' : raging ? '#e0503a' : '#7cc26a');
+  hull.addColorStop(0.65, flashing ? '#ffffff' : raging ? '#a3241c' : '#3f8a44');
+  hull.addColorStop(1, flashing ? '#ffffff' : raging ? '#380a08' : '#15311c');
   ctx.fillStyle = hull;
   ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
 
@@ -1524,6 +1740,28 @@ function drawPlayer(t){
   ctx.beginPath(); ctx.arc(-r*0.2, -r*0.92, r*0.13, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = 'rgba(8,14,9,0.8)'; ctx.lineWidth = 1.1;
   ctx.beginPath(); ctx.arc(-r*0.2, -r*0.92, r*0.13, 0, Math.PI*2); ctx.stroke();
+
+  // active-ability visual feedback
+  if (player.shieldTimer > 0){
+    const sAlpha = 0.4 + Math.sin(t/80)*0.25;
+    ctx.strokeStyle = `rgba(93,255,224,${sAlpha})`;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#5dffe0'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(0,0,r*1.35,0,Math.PI*2); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  if (player.surgeTimer > 0){
+    const pulse = 0.5 + Math.sin(t/90)*0.5;
+    ctx.strokeStyle = `rgba(255,225,93,${0.3+pulse*0.35})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0,0,r*1.18,0,Math.PI*2); ctx.stroke();
+  }
+  if (player.novaBurstTimer > 0){
+    const prog = 1 - player.novaBurstTimer/NOVA_BURST_DURATION;
+    ctx.strokeStyle = `rgba(160,255,240,${1-prog})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0,0, NOVA_RADIUS*prog, 0, Math.PI*2); ctx.stroke();
+  }
 
   ctx.restore();
 }
@@ -1793,14 +2031,15 @@ function drawTurretEnemy(e, ang, t){
 
 function drawBoss(e, ang, t){
   const r = e.radius;
+  const p = e.palette || WARDEN_PALETTES[0];
   // rotating outer track with lit inner edge
   ctx.save();
   ctx.rotate(t/2000);
-  ctx.strokeStyle = 'rgba(90,15,34,0.8)';
+  ctx.strokeStyle = p.track;
   ctx.lineWidth = 6;
   ctx.setLineDash([14,10]);
   ctx.beginPath(); ctx.arc(0,0,r*1.15,0,Math.PI*2); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,120,150,0.25)';
+  ctx.strokeStyle = p.trackLit;
   ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(0,0,r*1.13,0,Math.PI*2); ctx.stroke();
   ctx.setLineDash([]);
@@ -1812,31 +2051,31 @@ function drawBoss(e, ang, t){
   for (let i=0;i<8;i++){
     ctx.save();
     ctx.rotate(i*Math.PI/4);
-    ctx.fillStyle = '#4a0c1d';
+    ctx.fillStyle = p.blade;
     ctx.beginPath();
     ctx.moveTo(r*0.95,0);
     ctx.lineTo(r*1.3, -r*0.08);
     ctx.lineTo(r*1.3, r*0.08);
     ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,110,140,0.35)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = p.bladeEdge; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(r*0.97,-r*0.01); ctx.lineTo(r*1.28,-r*0.07); ctx.stroke();
     ctx.restore();
   }
   ctx.restore();
 
-  // armored core: dark crimson steel lit from the upper-left
+  // armored core: dark steel lit from the upper-left
   const core = ctx.createRadialGradient(-r*0.35,-r*0.4, r*0.06, r*0.05, r*0.05, r*1.15);
-  core.addColorStop(0,'#b23a52');
-  core.addColorStop(0.4,'#7a1830');
-  core.addColorStop(0.75,'#40091a');
-  core.addColorStop(1,'#1c030c');
+  core.addColorStop(0,p.core0);
+  core.addColorStop(0.4,p.core1);
+  core.addColorStop(0.75,p.core2);
+  core.addColorStop(1,p.core3);
   ctx.fillStyle = core;
   ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle = 'rgba(10,2,6,0.85)'; ctx.lineWidth = r*0.05;
+  ctx.strokeStyle = p.coreOutline; ctx.lineWidth = r*0.05;
   ctx.beginPath(); ctx.arc(0,0,r*0.985,0,Math.PI*2); ctx.stroke();
 
   // plate seam + slowly rotating rivet ring
-  ctx.strokeStyle = 'rgba(20,4,10,0.6)'; ctx.lineWidth = 1.6;
+  ctx.strokeStyle = p.seam; ctx.lineWidth = 1.6;
   ctx.beginPath(); ctx.arc(0,0,r*0.78,0,Math.PI*2); ctx.stroke();
   for (let i=0;i<12;i++){
     const a = i*Math.PI/6 + t/3000;
@@ -1845,8 +2084,8 @@ function drawBoss(e, ang, t){
   }
 
   // glowing conduits radiating from the core
-  ctx.shadowColor = '#ff3050'; ctx.shadowBlur = 6;
-  ctx.strokeStyle = 'rgba(255,90,120,0.55)'; ctx.lineWidth = 1.5;
+  ctx.shadowColor = p.conduitGlow; ctx.shadowBlur = 6;
+  ctx.strokeStyle = p.conduitStroke; ctx.lineWidth = 1.5;
   for (let i=0;i<8;i++){
     const a = i*Math.PI/4 + t/2400;
     ctx.beginPath();
@@ -1865,8 +2104,8 @@ function drawBoss(e, ang, t){
     pod.addColorStop(0,'#3a1220'); pod.addColorStop(1,'#0d0208');
     ctx.fillStyle = pod;
     ctx.beginPath(); ctx.arc(ex,ey,r*0.12,0,Math.PI*2); ctx.fill();
-    ctx.shadowColor = '#ff5d78'; ctx.shadowBlur = 5;
-    ctx.fillStyle = '#ff5d78';
+    ctx.shadowColor = p.podGlow; ctx.shadowBlur = 5;
+    ctx.fillStyle = p.podGlow;
     ctx.beginPath(); ctx.arc(ex,ey,r*0.055*eyePulse,0,Math.PI*2); ctx.fill();
     ctx.shadowBlur = 0;
   }
@@ -1883,10 +2122,10 @@ function drawBoss(e, ang, t){
   ctx.beginPath(); ctx.arc(0,0,r*0.5,0,Math.PI*2); ctx.stroke();
   const iris = ctx.createRadialGradient(r*0.12,0, r*0.01, r*0.15,0, r*0.3*pulse);
   iris.addColorStop(0,'#ffffff');
-  iris.addColorStop(0.35,'#ffb3c0');
-  iris.addColorStop(0.7,'#ff1f45');
-  iris.addColorStop(1,'#5a0716');
-  ctx.shadowColor = '#ff1f45'; ctx.shadowBlur = 14;
+  iris.addColorStop(0.35,p.iris1);
+  iris.addColorStop(0.7,p.iris2);
+  iris.addColorStop(1,p.iris3);
+  ctx.shadowColor = p.eyeGlow; ctx.shadowBlur = 14;
   ctx.fillStyle = iris;
   ctx.beginPath(); ctx.arc(r*0.14,0,r*0.28*pulse,0,Math.PI*2); ctx.fill();
   ctx.shadowBlur = 0;
@@ -2013,7 +2252,8 @@ function draw(t){
       ctx.strokeStyle = '#3a1010'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(0,-b.radius); ctx.lineTo(0,b.radius); ctx.stroke();
     } else if (b.kind === 'boss'){
-      ctx.fillStyle = '#ff1f45'; ctx.shadowColor='#ff1f45'; ctx.shadowBlur=12;
+      const bc = b.color || '#ff1f45';
+      ctx.fillStyle = bc; ctx.shadowColor=bc; ctx.shadowBlur=12;
       ctx.beginPath(); ctx.ellipse(0,0,b.radius*1.8,b.radius,0,0,Math.PI*2); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
       ctx.beginPath(); ctx.ellipse(b.radius*0.3,0,b.radius*0.7,b.radius*0.35,0,0,Math.PI*2); ctx.fill();
@@ -2034,7 +2274,18 @@ function draw(t){
   });
 
   hpBarInner.style.width = clamp(player.hp/player.maxHp,0,1)*100 + '%';
+  hpText.textContent = Math.ceil(Math.max(0,player.hp)) + ' / ' + Math.round(player.maxHp);
   dashBarInner.style.width = (1 - player.dashCooldownTimer/player.dashCooldown)*100 + '%';
+  updateAbilityHud(player.novaUnlocked, player.novaCooldownTimer, player.novaCooldown, novaBarOuter, novaBarInner, novaLabel, '[Z] NOVA');
+  updateAbilityHud(player.shieldUnlocked, player.shieldCooldownTimer, player.shieldCooldown, shieldBarOuter, shieldBarInner, shieldLabel, '[X] SHIELD');
+  updateAbilityHud(player.surgeUnlocked, player.surgeCooldownTimer, player.surgeCooldown, surgeBarOuter, surgeBarInner, surgeLabel, '[C] SURGE');
+}
+
+function updateAbilityHud(unlocked, cooldownTimer, cooldown, barOuter, barInner, label, name){
+  barOuter.classList.toggle('locked', !unlocked);
+  label.classList.toggle('locked', !unlocked);
+  barInner.style.width = unlocked ? (1 - cooldownTimer/cooldown)*100 + '%' : '0%';
+  label.textContent = unlocked ? name : name + ' — LOCKED';
 }
 
 // ---------- loop ----------
