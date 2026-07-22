@@ -800,8 +800,10 @@ function enemyShoot(e, t){
     enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(ang)*160, vy:Math.sin(ang)*160, radius:6, damage:16*dmgScale, homing:true, turn:2.4, life:4000, kind:'turret'});
     Audio8.sfx.turretLaunch();
   } else if (e.type === 'boss'){
-    for (let d=-0.5; d<=0.5; d+=0.16){
-      const a = ang+d;
+    const bulletCount = 20;
+    const spin = (t/900) % (Math.PI*2);
+    for (let i=0; i<bulletCount; i++){
+      const a = spin + i*(Math.PI*2/bulletCount);
       enemyBullets.push({x:e.x,y:e.y, vx:Math.cos(a)*230, vy:Math.sin(a)*230, radius:6, damage:14*dmgScale, homing:false, kind:'boss'});
     }
     Audio8.sfx.bossShoot();
@@ -1029,17 +1031,17 @@ function triggerGameOver(){
 }
 
 // ---------- draw ----------
-function drawGrid(t){
+function drawIndoorBase(t, floorColors, gridColor, lightColor){
   // depth-shaded floor base (darker toward the far/top wall, lighter near the viewer)
   const floor = ctx.createLinearGradient(0,0,0,H);
-  floor.addColorStop(0, '#050810');
-  floor.addColorStop(0.2, '#0a121b');
-  floor.addColorStop(1, '#101c28');
+  floor.addColorStop(0, floorColors[0]);
+  floor.addColorStop(0.2, floorColors[1]);
+  floor.addColorStop(1, floorColors[2]);
   ctx.fillStyle = floor;
   ctx.fillRect(0,0,W,H);
 
   // converging verticals toward a vanishing point above the screen (perspective floor)
-  ctx.strokeStyle = 'rgba(35,90,120,0.4)';
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 1;
   for (let i=-8;i<=8;i++){
     const xBottom = W/2 + i*70;
@@ -1060,8 +1062,8 @@ function drawGrid(t){
   // ceiling light pools
   for (const lx of [W*0.22, W*0.5, W*0.78]){
     const glow = ctx.createRadialGradient(lx, -20, 10, lx, -20, 200);
-    glow.addColorStop(0,'rgba(90,220,255,0.14)');
-    glow.addColorStop(1,'rgba(90,220,255,0)');
+    glow.addColorStop(0,lightColor);
+    glow.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle = glow;
     ctx.fillRect(lx-200, -20, 400, 240);
   }
@@ -1076,6 +1078,173 @@ function drawGrid(t){
     ctx.fillStyle = sweep;
     ctx.fillRect(0, sweepY-40, W, 80);
   }
+}
+
+// each entry: shared perspective base colors, then a signature overlay tying it to the sector name
+const INDOOR_THEMES = [
+  { // 1 CONTAINMENT WING — clinical cell block, red alarm pulse, broken pods along the walls
+    floor:['#0a0608','#140a0d','#1e1013'], grid:'rgba(140,40,50,0.35)', light:'rgba(255,90,90,0.12)',
+    extra(t){
+      const pulse = 0.5 + Math.sin(t/500)*0.5;
+      ctx.fillStyle = `rgba(255,40,50,${0.05+pulse*0.08})`;
+      ctx.fillRect(0,0,W,H);
+      ctx.strokeStyle = 'rgba(255,140,140,0.35)'; ctx.lineWidth = 3;
+      for (const side of [0.06,0.94]){
+        for (let j=1;j<=10;j++){
+          const k=j/10; const y = H - H*Math.pow(k,1.8);
+          ctx.beginPath(); ctx.moveTo(W*side-10,y); ctx.lineTo(W*side+10,y); ctx.stroke();
+        }
+      }
+    }
+  },
+  { // 2 SECURITY CHECKPOINT — barrier lane, amber hazard floor, posts (one knocked down)
+    floor:['#0a0906','#15130c','#231f14'], grid:'rgba(200,150,40,0.32)', light:'rgba(255,200,90,0.13)',
+    extra(t){
+      ctx.strokeStyle = 'rgba(255,190,60,0.5)'; ctx.lineWidth = 10;
+      ctx.setLineDash([26,18]);
+      ctx.beginPath(); ctx.moveTo(0,H*0.82); ctx.lineTo(W,H*0.82); ctx.stroke();
+      ctx.setLineDash([]);
+      for (const bx of [W*0.15, W*0.5, W*0.85]){
+        const g = ctx.createRadialGradient(bx,H*0.7,4,bx,H*0.7,90);
+        g.addColorStop(0,'rgba(255,210,120,0.28)'); g.addColorStop(1,'rgba(255,210,120,0)');
+        ctx.fillStyle = g; ctx.fillRect(bx-90,H*0.7-90,180,180);
+      }
+    }
+  },
+  { // 3 MOTOR POOL — vehicle bay, oil stains, tread marks, parked vehicles
+    floor:['#07090a','#0d1113','#141a1c'], grid:'rgba(90,110,120,0.3)', light:'rgba(200,220,230,0.1)',
+    extra(t){
+      ctx.fillStyle = 'rgba(10,10,10,0.4)';
+      [[W*0.2,H*0.75,70,26],[W*0.65,H*0.6,55,20],[W*0.85,H*0.85,80,30]].forEach(([sx,sy,rx,ry])=>{
+        ctx.beginPath(); ctx.ellipse(sx,sy,rx,ry,0.3,0,Math.PI*2); ctx.fill();
+      });
+      ctx.strokeStyle = 'rgba(255,200,60,0.4)'; ctx.lineWidth = 6; ctx.setLineDash([2,14]);
+      for (let i=-3;i<=3;i+=6){
+        ctx.beginPath(); ctx.moveTo(W/2+i*70, H); ctx.lineTo(W/2+i*70*0.1, 0); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+  },
+  { // 4 MISSILE SILO ACCESS — concentric silo rings, red targeting glow, racked missiles
+    floor:['#060608','#0c0c14','#12121e'], grid:'rgba(150,60,200,0.3)', light:'rgba(255,80,80,0.14)',
+    extra(t){
+      ctx.strokeStyle = 'rgba(255,70,70,0.35)'; ctx.lineWidth = 2;
+      for (let i=1;i<=4;i++){
+        const r = i*60 + Math.sin(t/700)*6;
+        ctx.beginPath(); ctx.arc(W/2,0,r,0,Math.PI*2); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,120,120,0.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W/2-16,10); ctx.lineTo(W/2+16,10); ctx.moveTo(W/2,-6); ctx.lineTo(W/2,26); ctx.stroke();
+    }
+  },
+  { // 5 DEEP STORAGE — crate stacks, dim green emergency light, a forklift, drifting dust
+    floor:['#050705','#0a0f0a','#0f150f'], grid:'rgba(60,120,70,0.3)', light:'rgba(120,255,140,0.09)',
+    extra(t){
+      ctx.fillStyle = 'rgba(30,50,32,0.55)'; ctx.strokeStyle='rgba(90,150,100,0.4)'; ctx.lineWidth=1;
+      for (const side of [-1,1]){
+        for (let j=0;j<5;j++){
+          const k=(j+1)/6; const y = H - H*Math.pow(k,1.8);
+          const w = 40+ k*90, h = 18+k*40;
+          const x = side>0 ? W - w*0.6 - k*30 : -w*0.4 + k*30;
+          ctx.fillRect(x,y-h,w,h); ctx.strokeRect(x,y-h,w,h);
+        }
+      }
+      for (let i=0;i<18;i++){
+        const dx = (i*173 + t*0.02) % W;
+        const dy = (i*97 + t*0.01) % H;
+        ctx.fillStyle = 'rgba(150,255,170,0.15)';
+        ctx.beginPath(); ctx.arc(dx,dy,1.4,0,Math.PI*2); ctx.fill();
+      }
+    }
+  },
+  { // 6 REACTOR CORE — pulsing radial core glow, radiation stripes, central reactor structure
+    floor:['#0a0704','#150e06','#201607'], grid:'rgba(255,150,40,0.3)', light:'rgba(255,180,60,0.14)',
+    extra(t){
+      const pulse = 0.5 + Math.sin(t/400)*0.5;
+      const core = ctx.createRadialGradient(W/2,H*0.15,10,W/2,H*0.15,260+pulse*40);
+      core.addColorStop(0,`rgba(255,180,60,${0.32+pulse*0.15})`);
+      core.addColorStop(0.5,'rgba(120,255,140,0.08)');
+      core.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = core; ctx.fillRect(0,0,W,H*0.6);
+      ctx.strokeStyle = 'rgba(255,200,80,0.3)'; ctx.lineWidth = 14;
+      ctx.setLineDash([30,20]);
+      ctx.beginPath(); ctx.moveTo(0,H*0.92); ctx.lineTo(W,H*0.92); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  },
+  { // 7 RESEARCH WING — lab tile, sickly specimen tanks along the walls
+    floor:['#050a08','#0a120e','#0e1a13'], grid:'rgba(80,200,140,0.28)', light:'rgba(140,255,190,0.1)',
+    extra(t){
+      for (const side of [0.08,0.28,0.72,0.92]){
+        const flick = 0.6+Math.sin(t/300+side*10)*0.4;
+        const g = ctx.createLinearGradient(0,0,0,H);
+        g.addColorStop(0,`rgba(120,255,170,${0.02})`);
+        g.addColorStop(0.6,`rgba(120,255,170,${0.05+flick*0.06})`);
+        g.addColorStop(1,'rgba(120,255,170,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(W*side-14,0,28,H);
+      }
+    }
+  },
+  { // 8 COMMAND DECK — dark bridge, holographic map glow, status lights, consoles
+    floor:['#040608','#080c10','#0c1218'], grid:'rgba(60,140,200,0.28)', light:'rgba(90,180,255,0.14)',
+    extra(t){
+      const g = ctx.createRadialGradient(W/2,H*0.05,10,W/2,H*0.05,220);
+      g.addColorStop(0,'rgba(80,180,255,0.22)'); g.addColorStop(1,'rgba(80,180,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(0,0,W,H*0.4);
+      ctx.strokeStyle = 'rgba(120,200,255,0.3)'; ctx.lineWidth = 1;
+      for (let i=1;i<=3;i++){ ctx.beginPath(); ctx.arc(W/2,10,i*38,0,Math.PI*2); ctx.stroke(); }
+      for (let i=0;i<10;i++){
+        const sx = (i*257)%W, sy = (i*131)%(H*0.3);
+        const blink = Math.sin(t/260+i)>0.4;
+        ctx.fillStyle = blink? 'rgba(150,220,255,0.8)':'rgba(150,220,255,0.15)';
+        ctx.beginPath(); ctx.arc(sx,sy,1.6,0,Math.PI*2); ctx.fill();
+      }
+    }
+  },
+  { // 9 POWER RELAY — high-voltage pylons with arcing electricity, hazard stripes
+    floor:['#08080a','#0f0d10','#161016'], grid:'rgba(220,220,80,0.3)', light:'rgba(255,255,140,0.12)',
+    extra(t){
+      ctx.strokeStyle = 'rgba(255,230,90,0.45)'; ctx.lineWidth = 12;
+      ctx.setLineDash([18,10]);
+      ctx.beginPath(); ctx.moveTo(0,H*0.05); ctx.lineTo(W,H*0.05); ctx.stroke();
+      ctx.setLineDash([]);
+      if (Math.sin(t/130) > 0.7){
+        const p1x = W*0.15, p1y = H*0.1;
+        const p2x = W*0.85, p2y = H*0.1;
+        ctx.strokeStyle = 'rgba(230,240,255,0.8)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p1x,p1y);
+        let x=p1x, y=p1y;
+        const steps=6;
+        for (let i=1;i<=steps;i++){
+          x = p1x + (p2x-p1x)*(i/steps) + rand(-14,14);
+          y = p1y + (p2y-p1y)*(i/steps) + rand(-14,14);
+          ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      }
+    }
+  },
+  { // 10 OVERSEER CORE — boss arena, ominous pulsing red eye glow, overseer tower
+    floor:['#060305','#12070a','#1d0a0e'], grid:'rgba(200,30,50,0.4)', light:'rgba(255,40,60,0.16)',
+    extra(t){
+      const pulse = 0.5 + Math.sin(t/350)*0.5;
+      const eye = ctx.createRadialGradient(W/2,H*0.12,6,W/2,H*0.12,220+pulse*50);
+      eye.addColorStop(0,`rgba(255,40,60,${0.35+pulse*0.2})`);
+      eye.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = eye; ctx.fillRect(0,0,W,H*0.5);
+      ctx.strokeStyle = `rgba(255,60,80,${0.3+pulse*0.25})`; ctx.lineWidth = 16;
+      ctx.setLineDash([34,22]);
+      ctx.beginPath(); ctx.moveTo(0,H*0.9); ctx.lineTo(W,H*0.9); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  },
+];
+
+function drawIndoorBackground(t){
+  const theme = INDOOR_THEMES[Math.min(state.sector, INDOOR_THEMES.length) - 1] || INDOOR_THEMES[0];
+  drawIndoorBase(t, theme.floor, theme.grid, theme.light);
+  theme.extra(t);
 }
 
 function isOutdoor(sector){ return sector > BOSS_INTERVAL; }
@@ -1758,7 +1927,7 @@ function drawVignette(){
 
 function draw(t){
   ctx.clearRect(0,0,W,H);
-  if (isOutdoor(state.sector)) drawOutdoorBackground(t); else drawGrid(t);
+  if (isOutdoor(state.sector)) drawOutdoorBackground(t); else drawIndoorBackground(t);
   drawVignette();
 
   if (state.mode === 'title'){
@@ -1785,7 +1954,6 @@ function draw(t){
 
   drawPlayer(t);
   enemies.forEach(e => drawEnemy(e, t));
-
   bullets.forEach(b => {
     const bang = Math.atan2(b.vy,b.vx);
     ctx.save(); ctx.translate(b.x,b.y); ctx.rotate(bang);
