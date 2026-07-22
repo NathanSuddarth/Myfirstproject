@@ -35,7 +35,7 @@
   }
   .card:hover { background:#16324a; transform:translateY(-4px); border-color:#7ff; }
   .card .cardIcon {
-    font-size:36px; line-height:1; margin-bottom:8px;
+    width:64px; height:64px; margin-bottom:8px;
     filter:drop-shadow(0 0 6px #2ce8ff);
   }
   .card h3 { color:#ffe15d; font-size:15px; margin-bottom:8px; letter-spacing:1px; }
@@ -427,26 +427,26 @@ function makeEnemy(type, sector){
 
 // ---------- upgrades ----------
 const UPGRADE_POOL = [
-  { key:'damage', icon:'💥', name:'OVERCHARGE ROUNDS', desc:'+35% weapon damage', apply:p=>p.damage*=1.35 },
-  { key:'firerate', icon:'⚡', name:'RAPID CYCLER', desc:'-20% shot cooldown', apply:p=>p.fireCooldown*=0.8 },
-  { key:'maxhp', icon:'🛡️', name:'REINFORCED PLATING', desc:'+100 max integrity first time, +15% each time after', apply:p=>{const gain=p.upgrades.includes('REINFORCED PLATING')?p.maxHp*0.15:100;p.maxHp+=gain;p.hp=Math.min(p.maxHp,p.hp+gain);} },
-  { key:'speed', icon:'🚀', name:'SERVO BOOST', desc:'+18% movement speed', apply:p=>p.speed*=1.18 },
-  { key:'multishot', icon:'✴️', name:'TWIN EMITTER', desc:'+1 projectile per shot', apply:p=>p.multishot+=1 },
-  { key:'dash', icon:'🌀', name:'CAPACITOR TUNING', desc:'-25% dash cooldown', apply:p=>p.dashCooldown*=0.75 },
-  { key:'armor', icon:'🔰', name:'ABLATIVE ARMOR', desc:'-15% damage taken', apply:p=>p.armor=1-(1-p.armor)*0.85 },
-  { key:'pierce', icon:'🎯', name:'PENETRATOR CORE', desc:'Shots pierce +1 enemy', apply:p=>p.pierce+=1 },
-  { key:'heal', icon:'❤️', name:'NANITE REPAIR', desc:'Restore 40 integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+40) },
-  { key:'crit', icon:'🎲', name:'CRITICAL OVERLOAD', desc:'+15% chance to deal 2x damage', apply:p=>p.critChance=Math.min(1,p.critChance+0.15) },
-  { key:'ricochet', icon:'🔄', name:'RICOCHET ROUNDS', desc:'Shots bounce off walls +1 time', apply:p=>p.ricochet+=1 },
-  { key:'lifesteal', icon:'🩸', name:'VAMPIRIC ROUNDS', desc:'Heal 5% max integrity per kill', apply:p=>p.lifesteal+=0.05 },
-  { key:'regen', icon:'♻️', name:'NANOBOT REGEN', desc:'Regenerate 2% max integrity/sec', apply:p=>p.regen+=0.02 },
-  { key:'bulletspeed', icon:'💨', name:'OVERDRIVE COILS', desc:'+25% projectile speed', apply:p=>p.bulletSpeedMult*=1.25 },
-  { key:'turbodash', icon:'🏎️', name:'TURBO THRUSTERS', desc:'+25% dash speed, longer dash', apply:p=>{p.dashSpeed*=1.25;p.dashDuration+=40;} },
-  { key:'precision', icon:'🔬', name:'PRECISION OPTICS', desc:'-50% multishot spread', apply:p=>p.spreadMult*=0.5 },
-  { key:'glasscannon', icon:'☠️', name:'GLASS CANNON MATRIX', desc:'+75% damage, -20 max integrity', apply:p=>{p.damage*=1.75;p.maxHp=Math.max(20,p.maxHp-20);p.hp=Math.min(p.hp,p.maxHp);} },
-  { key:'revive', icon:'💾', name:'EMERGENCY REBOOT', desc:'Revive once at 50% integrity when destroyed', apply:p=>p.hasRevive=true },
-  { key:'homing', icon:'🧲', name:'TARGETING AI', desc:'Shots steer toward the nearest enemy', apply:p=>p.homingTurn+=2.5/3 },
-  { key:'medkit', icon:'🩹', name:'REPAIR SURGE', desc:'Restore 50% of missing integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+(p.maxHp-p.hp)*0.5) },
+  { key:'damage', cat:'offense', name:'OVERCHARGE ROUNDS', desc:'+35% weapon damage', apply:p=>p.damage*=1.35 },
+  { key:'firerate', cat:'offense', name:'RAPID CYCLER', desc:'-20% shot cooldown', apply:p=>p.fireCooldown*=0.8 },
+  { key:'maxhp', cat:'defense', name:'REINFORCED PLATING', desc:'+100 max integrity first time, +15% each time after', apply:p=>{const gain=p.upgrades.includes('REINFORCED PLATING')?p.maxHp*0.15:100;p.maxHp+=gain;p.hp=Math.min(p.maxHp,p.hp+gain);} },
+  { key:'speed', cat:'utility', name:'SERVO BOOST', desc:'+18% movement speed', apply:p=>p.speed*=1.18 },
+  { key:'multishot', cat:'offense', name:'TWIN EMITTER', desc:'+1 projectile per shot', apply:p=>p.multishot+=1 },
+  { key:'dash', cat:'utility', name:'CAPACITOR TUNING', desc:'-25% dash cooldown', apply:p=>p.dashCooldown*=0.75 },
+  { key:'armor', cat:'defense', name:'ABLATIVE ARMOR', desc:'-15% damage taken', apply:p=>p.armor=1-(1-p.armor)*0.85 },
+  { key:'pierce', cat:'offense', name:'PENETRATOR CORE', desc:'Shots pierce +1 enemy', apply:p=>p.pierce+=1 },
+  { key:'heal', cat:'defense', name:'NANITE REPAIR', desc:'Restore 40 integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+40) },
+  { key:'crit', cat:'offense', name:'CRITICAL OVERLOAD', desc:'+15% chance to deal 2x damage', apply:p=>p.critChance=Math.min(1,p.critChance+0.15) },
+  { key:'ricochet', cat:'offense', name:'RICOCHET ROUNDS', desc:'Shots bounce off walls +1 time', apply:p=>p.ricochet+=1 },
+  { key:'lifesteal', cat:'defense', name:'VAMPIRIC ROUNDS', desc:'Heal 5% max integrity per kill', apply:p=>p.lifesteal+=0.05 },
+  { key:'regen', cat:'defense', name:'NANOBOT REGEN', desc:'Regenerate 2% max integrity/sec', apply:p=>p.regen+=0.02 },
+  { key:'bulletspeed', cat:'offense', name:'OVERDRIVE COILS', desc:'+25% projectile speed', apply:p=>p.bulletSpeedMult*=1.25 },
+  { key:'turbodash', cat:'utility', name:'TURBO THRUSTERS', desc:'+25% dash speed, longer dash', apply:p=>{p.dashSpeed*=1.25;p.dashDuration+=40;} },
+  { key:'precision', cat:'utility', name:'PRECISION OPTICS', desc:'-50% multishot spread', apply:p=>p.spreadMult*=0.5 },
+  { key:'glasscannon', cat:'offense', name:'GLASS CANNON MATRIX', desc:'+75% damage, -20 max integrity', apply:p=>{p.damage*=1.75;p.maxHp=Math.max(20,p.maxHp-20);p.hp=Math.min(p.hp,p.maxHp);} },
+  { key:'revive', cat:'defense', name:'EMERGENCY REBOOT', desc:'Revive once at 50% integrity when destroyed', apply:p=>p.hasRevive=true },
+  { key:'homing', cat:'offense', name:'TARGETING AI', desc:'Shots steer toward the nearest enemy', apply:p=>p.homingTurn+=2.5/3 },
+  { key:'medkit', cat:'defense', name:'REPAIR SURGE', desc:'Restore 50% of missing integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+(p.maxHp-p.hp)*0.5) },
 ];
 
 function offerUpgrades(){
