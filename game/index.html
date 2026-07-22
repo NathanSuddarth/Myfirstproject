@@ -36,7 +36,6 @@
   .card:hover { background:#16324a; transform:translateY(-4px); border-color:#7ff; }
   .card .cardIcon {
     width:64px; height:64px; margin-bottom:8px;
-    filter:drop-shadow(0 0 6px #2ce8ff);
   }
   .card h3 { color:#ffe15d; font-size:15px; margin-bottom:8px; letter-spacing:1px; }
   .card p { font-size:12px; color:#bfeaff; line-height:1.4; max-width:none; }
@@ -431,21 +430,21 @@ const UPGRADE_POOL = [
   { key:'firerate', cat:'offense', name:'RAPID CYCLER', desc:'-20% shot cooldown', apply:p=>p.fireCooldown*=0.8 },
   { key:'maxhp', cat:'defense', name:'REINFORCED PLATING', desc:'+100 max integrity first time, +15% each time after', apply:p=>{const gain=p.upgrades.includes('REINFORCED PLATING')?p.maxHp*0.15:100;p.maxHp+=gain;p.hp=Math.min(p.maxHp,p.hp+gain);} },
   { key:'speed', cat:'utility', name:'SERVO BOOST', desc:'+18% movement speed', apply:p=>p.speed*=1.18 },
-  { key:'multishot', cat:'offense', name:'TWIN EMITTER', desc:'+1 projectile per shot', apply:p=>p.multishot+=1 },
+  { key:'multishot', cat:'offense', name:'TWIN EMITTER', desc:'+50% projectile count (rounded up)', apply:p=>p.multishot=Math.ceil(p.multishot*1.5) },
   { key:'dash', cat:'utility', name:'CAPACITOR TUNING', desc:'-25% dash cooldown', apply:p=>p.dashCooldown*=0.75 },
   { key:'armor', cat:'defense', name:'ABLATIVE ARMOR', desc:'-15% damage taken', apply:p=>p.armor=1-(1-p.armor)*0.85 },
-  { key:'pierce', cat:'offense', name:'PENETRATOR CORE', desc:'Shots pierce +1 enemy', apply:p=>p.pierce+=1 },
-  { key:'heal', cat:'defense', name:'NANITE REPAIR', desc:'Restore 40 integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+40) },
-  { key:'crit', cat:'offense', name:'CRITICAL OVERLOAD', desc:'+15% chance to deal 2x damage', apply:p=>p.critChance=Math.min(1,p.critChance+0.15) },
-  { key:'ricochet', cat:'offense', name:'RICOCHET ROUNDS', desc:'Shots bounce off walls +1 time', apply:p=>p.ricochet+=1 },
-  { key:'lifesteal', cat:'defense', name:'VAMPIRIC ROUNDS', desc:'Heal 5% max integrity per kill', apply:p=>p.lifesteal+=0.05 },
-  { key:'regen', cat:'defense', name:'NANOBOT REGEN', desc:'Regenerate 2% max integrity/sec', apply:p=>p.regen+=0.02 },
+  { key:'pierce', cat:'offense', name:'PENETRATOR CORE', desc:'Shots pierce 1 enemy first time, then +50% pierce count each time after', apply:p=>{p.pierce=p.upgrades.includes('PENETRATOR CORE')?Math.ceil(p.pierce*1.5):1;} },
+  { key:'heal', cat:'defense', name:'NANITE REPAIR', desc:'Restore 25% max integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+p.maxHp*0.25) },
+  { key:'crit', cat:'offense', name:'CRITICAL OVERLOAD', desc:'+20% chance to deal 2x damage', apply:p=>p.critChance=Math.min(1,p.critChance+0.2) },
+  { key:'ricochet', cat:'offense', name:'RICOCHET ROUNDS', desc:'Shots bounce 1 extra time first pick, then +50% bounce count each time after', apply:p=>{p.ricochet=p.upgrades.includes('RICOCHET ROUNDS')?Math.ceil(p.ricochet*1.5):1;} },
+  { key:'lifesteal', cat:'defense', name:'VAMPIRIC ROUNDS', desc:'Heal 5% max integrity per kill first pick, then +50% multiplicatively each time after', apply:p=>{p.lifesteal=p.upgrades.includes('VAMPIRIC ROUNDS')?p.lifesteal*1.5:0.05;} },
+  { key:'regen', cat:'defense', name:'NANOBOT REGEN', desc:'Regenerate 2% max integrity/sec first pick, then +50% multiplicatively each time after', apply:p=>{p.regen=p.upgrades.includes('NANOBOT REGEN')?p.regen*1.5:0.02;} },
   { key:'bulletspeed', cat:'offense', name:'OVERDRIVE COILS', desc:'+25% projectile speed', apply:p=>p.bulletSpeedMult*=1.25 },
-  { key:'turbodash', cat:'utility', name:'TURBO THRUSTERS', desc:'+25% dash speed, longer dash', apply:p=>{p.dashSpeed*=1.25;p.dashDuration+=40;} },
+  { key:'turbodash', cat:'utility', name:'TURBO THRUSTERS', desc:'+25% dash speed and duration', apply:p=>{p.dashSpeed*=1.25;p.dashDuration*=1.25;} },
   { key:'precision', cat:'utility', name:'PRECISION OPTICS', desc:'-50% multishot spread', apply:p=>p.spreadMult*=0.5 },
   { key:'glasscannon', cat:'offense', name:'GLASS CANNON MATRIX', desc:'+75% damage, -20 max integrity', apply:p=>{p.damage*=1.75;p.maxHp=Math.max(20,p.maxHp-20);p.hp=Math.min(p.hp,p.maxHp);} },
   { key:'revive', cat:'defense', name:'EMERGENCY REBOOT', desc:'Revive once at 50% integrity when destroyed', apply:p=>p.hasRevive=true },
-  { key:'homing', cat:'offense', name:'TARGETING AI', desc:'Shots steer toward the nearest enemy', apply:p=>p.homingTurn+=2.5/3 },
+  { key:'homing', cat:'offense', name:'TARGETING AI', desc:'Shots steer toward the nearest enemy, turn rate +50% multiplicatively each time after first', apply:p=>{p.homingTurn=p.upgrades.includes('TARGETING AI')?p.homingTurn*1.5:2.5/3;} },
   { key:'medkit', cat:'defense', name:'REPAIR SURGE', desc:'Restore 50% of missing integrity', apply:p=>p.hp=Math.min(p.maxHp,p.hp+(p.maxHp-p.hp)*0.5) },
 ];
 
@@ -468,16 +467,280 @@ function renderUpgradeCards(picks){
     <div class="cards">
       ${picks.map((u,i) => `
         <div class="card" data-idx="${i}">
-          <div class="cardIcon">${u.icon}</div>
+          <canvas class="cardIcon" width="64" height="64"></canvas>
           <h3>${u.name}</h3>
           <p>${u.desc}</p>
           <span class="key">[${i+1}]</span>
         </div>`).join('')}
     </div>
   `;
-  overlay.querySelectorAll('.card').forEach(el => {
+  overlay.querySelectorAll('.card').forEach((el,i) => {
     el.addEventListener('click', () => pickUpgrade(parseInt(el.dataset.idx,10)));
+    const cvs = el.querySelector('.cardIcon');
+    drawUpgradeIcon(cvs.getContext('2d'), picks[i].key, picks[i].cat, 64);
   });
+}
+
+const ICON_CAT_COLORS = { offense:'#ff6a5e', defense:'#5dffe0', utility:'#ffe15d' };
+
+function drawUpgradeIcon(ictx, key, cat, size){
+  const cx = size/2, cy = size/2, R = size*0.46;
+  const accent = ICON_CAT_COLORS[cat] || '#7ff';
+  ictx.clearRect(0,0,size,size);
+
+  // soft backdrop that fades to transparent so it blends into the card body
+  const bg = ictx.createRadialGradient(cx-R*0.3, cy-R*0.4, 0, cx, cy, R);
+  bg.addColorStop(0,'rgba(28,58,78,0.5)');
+  bg.addColorStop(0.65,'rgba(13,22,34,0.28)');
+  bg.addColorStop(1,'rgba(13,22,34,0)');
+  ictx.fillStyle = bg;
+  ictx.beginPath(); ictx.arc(cx, cy, R, 0, Math.PI*2); ictx.fill();
+
+  ictx.save();
+  ictx.translate(cx, cy);
+  ictx.strokeStyle = '#eafcff';
+  ictx.fillStyle = '#eafcff';
+  ictx.lineWidth = size*0.055;
+  ictx.lineCap = 'round';
+  ictx.lineJoin = 'round';
+  const s = size*0.24; // unit scale for symbol paths
+
+  switch(key){
+    case 'damage': { // power-surge burst
+      ictx.beginPath();
+      for (let a=0; a<8; a++){
+        const ang = -Math.PI/2 + a*Math.PI/4;
+        const r1 = a%2===0 ? s*1.2 : s*0.5;
+        const x = Math.cos(ang)*r1, y = Math.sin(ang)*r1;
+        if (a===0) ictx.moveTo(x,y); else ictx.lineTo(x,y);
+      }
+      ictx.closePath();
+      ictx.fillStyle = accent; ictx.fill();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.03; ictx.stroke();
+      break;
+    }
+    case 'firerate': { // triple forward chevrons
+      ictx.lineWidth = size*0.07;
+      [-0.75,0,0.75].forEach(off=>{
+        ictx.beginPath();
+        ictx.moveTo(-s*0.5+off*s, -s*0.9);
+        ictx.lineTo(s*0.3+off*s, 0);
+        ictx.lineTo(-s*0.5+off*s, s*0.9);
+        ictx.stroke();
+      });
+      break;
+    }
+    case 'maxhp': { // segmented shield
+      ictx.beginPath();
+      ictx.moveTo(0,-s*1.15);
+      ictx.lineTo(s*1.0,-s*0.7);
+      ictx.lineTo(s*1.0,s*0.15);
+      ictx.quadraticCurveTo(s*1.0,s*0.95,0,s*1.25);
+      ictx.quadraticCurveTo(-s*1.0,s*0.95,-s*1.0,s*0.15);
+      ictx.lineTo(-s*1.0,-s*0.7);
+      ictx.closePath();
+      ictx.fillStyle = accent; ictx.fill();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.045; ictx.stroke();
+      ictx.strokeStyle = 'rgba(8,20,26,0.6)'; ictx.lineWidth = size*0.025;
+      ictx.beginPath(); ictx.moveTo(0,-s*0.95); ictx.lineTo(0,s*1.05); ictx.stroke();
+      ictx.beginPath(); ictx.moveTo(-s*0.85,-s*0.15); ictx.lineTo(s*0.85,-s*0.15); ictx.stroke();
+      break;
+    }
+    case 'speed': { // motion chevrons + dot
+      ictx.lineWidth = size*0.065;
+      [0,0.55].forEach(off=>{
+        ictx.beginPath();
+        ictx.moveTo(-s*1.1+off*s, -s*0.5);
+        ictx.lineTo(-s*0.4+off*s, 0);
+        ictx.lineTo(-s*1.1+off*s, s*0.5);
+        ictx.stroke();
+      });
+      ictx.fillStyle = accent;
+      ictx.beginPath(); ictx.arc(s*0.85,0,s*0.22,0,Math.PI*2); ictx.fill();
+      break;
+    }
+    case 'multishot': { // twin diverging emitters
+      ictx.lineWidth = size*0.065;
+      [-1,1].forEach(side=>{
+        ictx.beginPath();
+        ictx.moveTo(0, s*0.9);
+        ictx.lineTo(side*s*0.55, -s*1.0);
+        ictx.stroke();
+      });
+      ictx.fillStyle = accent;
+      ictx.beginPath(); ictx.arc(0, s*0.95, s*0.2, 0, Math.PI*2); ictx.fill();
+      break;
+    }
+    case 'dash': { // capacitor plates + spark
+      ictx.lineWidth = size*0.06;
+      ictx.beginPath(); ictx.moveTo(-s*0.35,-s*0.95); ictx.lineTo(-s*0.35,s*0.95); ictx.stroke();
+      ictx.beginPath(); ictx.moveTo(s*0.35,-s*0.95); ictx.lineTo(s*0.35,s*0.95); ictx.stroke();
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.055;
+      ictx.beginPath(); ictx.moveTo(-s*0.15,-s*0.6); ictx.lineTo(s*0.05,-s*0.05); ictx.lineTo(-s*0.1,-s*0.05); ictx.lineTo(s*0.15,s*0.6); ictx.stroke();
+      break;
+    }
+    case 'armor': { // hex plate
+      ictx.beginPath();
+      for (let a=0;a<6;a++){
+        const ang = -Math.PI/2 + a*Math.PI/3;
+        const x = Math.cos(ang)*s*1.05, y = Math.sin(ang)*s*1.05;
+        if (a===0) ictx.moveTo(x,y); else ictx.lineTo(x,y);
+      }
+      ictx.closePath();
+      ictx.fillStyle = accent; ictx.fill();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.045; ictx.stroke();
+      break;
+    }
+    case 'pierce': { // arrow through rings
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.05;
+      ictx.beginPath(); ictx.arc(0,0,s*0.95,0,Math.PI*2); ictx.stroke();
+      ictx.beginPath(); ictx.arc(0,0,s*0.5,0,Math.PI*2); ictx.stroke();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.07;
+      ictx.beginPath(); ictx.moveTo(-s*1.25,0); ictx.lineTo(s*1.1,0); ictx.stroke();
+      ictx.beginPath(); ictx.moveTo(s*0.7,-s*0.35); ictx.lineTo(s*1.25,0); ictx.lineTo(s*0.7,s*0.35); ictx.stroke();
+      break;
+    }
+    case 'heal': { // nanite cross in hex
+      ictx.beginPath();
+      for (let a=0;a<6;a++){
+        const ang = -Math.PI/2 + a*Math.PI/3;
+        const x = Math.cos(ang)*s*1.05, y = Math.sin(ang)*s*1.05;
+        if (a===0) ictx.moveTo(x,y); else ictx.lineTo(x,y);
+      }
+      ictx.closePath();
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.045; ictx.stroke();
+      ictx.fillStyle = '#eafcff';
+      roundRect(ictx, -s*0.22, -s*0.75, s*0.44, s*1.5, size*0.03); ictx.fill();
+      roundRect(ictx, -s*0.75, -s*0.22, s*1.5, s*0.44, size*0.03); ictx.fill();
+      break;
+    }
+    case 'crit': { // die face with pips
+      roundRect(ictx, -s*1.0, -s*1.0, s*2.0, s*2.0, size*0.06);
+      ictx.fillStyle = accent; ictx.fill();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.045; ictx.stroke();
+      ictx.fillStyle = '#0a1a20';
+      [[-0.5,-0.5],[0.5,0.5],[-0.5,0.5],[0.5,-0.5],[0,0]].forEach(([px,py])=>{
+        ictx.beginPath(); ictx.arc(px*s, py*s, s*0.16, 0, Math.PI*2); ictx.fill();
+      });
+      break;
+    }
+    case 'ricochet': { // bouncing zigzag between walls
+      ictx.lineWidth = size*0.06;
+      ictx.beginPath(); ictx.moveTo(-s*1.1,-s*1.1); ictx.lineTo(-s*1.1,s*1.1); ictx.stroke();
+      ictx.beginPath(); ictx.moveTo(s*1.1,-s*1.1); ictx.lineTo(s*1.1,s*1.1); ictx.stroke();
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.065;
+      ictx.beginPath();
+      ictx.moveTo(-s*1.1,-s*0.8); ictx.lineTo(s*0.9,-s*0.2); ictx.lineTo(-s*0.9,s*0.4); ictx.lineTo(s*1.1,s*1.0);
+      ictx.stroke();
+      break;
+    }
+    case 'lifesteal': { // droplet
+      ictx.beginPath();
+      ictx.moveTo(0,-s*1.2);
+      ictx.quadraticCurveTo(s*1.05,s*0.25,0,s*1.1);
+      ictx.quadraticCurveTo(-s*1.05,s*0.25,0,-s*1.2);
+      ictx.closePath();
+      ictx.fillStyle = accent; ictx.fill();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.04; ictx.stroke();
+      ictx.fillStyle = 'rgba(255,255,255,0.7)';
+      ictx.beginPath(); ictx.arc(-s*0.25,s*0.05,s*0.16,0,Math.PI*2); ictx.fill();
+      break;
+    }
+    case 'regen': { // two curved loop arrows
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.075;
+      ictx.beginPath(); ictx.arc(0,0,s*0.85,-Math.PI*0.2,Math.PI*1.0); ictx.stroke();
+      ictx.beginPath(); ictx.arc(0,0,s*0.85,Math.PI*0.8,Math.PI*2.0); ictx.stroke();
+      ictx.fillStyle = accent;
+      const a1 = Math.PI*1.0, p1x = Math.cos(a1)*s*0.85, p1y = Math.sin(a1)*s*0.85;
+      ictx.save(); ictx.translate(p1x,p1y); ictx.rotate(a1+Math.PI/2);
+      ictx.beginPath(); ictx.moveTo(-s*0.22,0); ictx.lineTo(s*0.22,0); ictx.lineTo(0,s*0.35); ictx.closePath(); ictx.fill();
+      ictx.restore();
+      const a2 = Math.PI*2.0, p2x = Math.cos(a2)*s*0.85, p2y = Math.sin(a2)*s*0.85;
+      ictx.save(); ictx.translate(p2x,p2y); ictx.rotate(a2+Math.PI/2);
+      ictx.beginPath(); ictx.moveTo(-s*0.22,0); ictx.lineTo(s*0.22,0); ictx.lineTo(0,s*0.35); ictx.closePath(); ictx.fill();
+      ictx.restore();
+      break;
+    }
+    case 'bulletspeed': { // coil spring
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.06;
+      ictx.beginPath();
+      for (let i=-4;i<=4;i++){
+        const x = i*s*0.28;
+        const y = (i%2===0? -s*0.55 : s*0.55);
+        if (i===-4) ictx.moveTo(x,y); else ictx.lineTo(x,y);
+      }
+      ictx.stroke();
+      break;
+    }
+    case 'turbodash': { // thruster flame
+      ictx.beginPath();
+      ictx.moveTo(-s*0.55,-s*1.0); ictx.lineTo(s*0.55,-s*1.0);
+      ictx.lineTo(s*0.3,s*0.2); ictx.lineTo(0,s*1.2); ictx.lineTo(-s*0.3,s*0.2);
+      ictx.closePath();
+      ictx.fillStyle = accent; ictx.fill();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.04; ictx.stroke();
+      break;
+    }
+    case 'precision': { // crosshair
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.055;
+      ictx.beginPath(); ictx.arc(0,0,s*0.9,0,Math.PI*2); ictx.stroke();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.05;
+      ictx.beginPath(); ictx.moveTo(0,-s*1.3); ictx.lineTo(0,-s*0.55); ictx.stroke();
+      ictx.beginPath(); ictx.moveTo(0,s*0.55); ictx.lineTo(0,s*1.3); ictx.stroke();
+      ictx.beginPath(); ictx.moveTo(-s*1.3,0); ictx.lineTo(-s*0.55,0); ictx.stroke();
+      ictx.beginPath(); ictx.moveTo(s*0.55,0); ictx.lineTo(s*1.3,0); ictx.stroke();
+      ictx.fillStyle = accent;
+      ictx.beginPath(); ictx.arc(0,0,s*0.12,0,Math.PI*2); ictx.fill();
+      break;
+    }
+    case 'glasscannon': { // cracked hex with jagged fracture
+      ictx.beginPath();
+      for (let a=0;a<6;a++){
+        const ang = -Math.PI/2 + a*Math.PI/3;
+        const x = Math.cos(ang)*s*1.05, y = Math.sin(ang)*s*1.05;
+        if (a===0) ictx.moveTo(x,y); else ictx.lineTo(x,y);
+      }
+      ictx.closePath();
+      ictx.fillStyle = 'rgba(255,106,94,0.25)'; ictx.fill();
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.045; ictx.stroke();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.04;
+      ictx.beginPath();
+      ictx.moveTo(-s*0.6,-s*0.9); ictx.lineTo(-s*0.1,-s*0.1); ictx.lineTo(-s*0.45,s*0.15);
+      ictx.lineTo(s*0.05,s*0.55); ictx.lineTo(-s*0.2,s*1.0);
+      ictx.stroke();
+      break;
+    }
+    case 'revive': { // power button
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.075;
+      ictx.beginPath(); ictx.arc(0,s*0.05,s*0.95,Math.PI*0.25,Math.PI*1.75); ictx.stroke();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.07;
+      ictx.beginPath(); ictx.moveTo(0,-s*1.1); ictx.lineTo(0,-s*0.05); ictx.stroke();
+      break;
+    }
+    case 'homing': { // radar reticle with orbit dot
+      ictx.strokeStyle = accent; ictx.lineWidth = size*0.05;
+      ictx.beginPath(); ictx.arc(0,0,s*0.95,0,Math.PI*2); ictx.stroke();
+      ictx.beginPath(); ictx.arc(0,0,s*0.55,0,Math.PI*2); ictx.stroke();
+      ictx.fillStyle = '#eafcff';
+      ictx.beginPath(); ictx.arc(0,0,s*0.14,0,Math.PI*2); ictx.fill();
+      ictx.fillStyle = accent;
+      ictx.beginPath(); ictx.arc(s*0.95,0,s*0.17,0,Math.PI*2); ictx.fill();
+      break;
+    }
+    case 'medkit': { // rounded case with plus + surge chevron
+      roundRect(ictx, -s*1.0, -s*0.85, s*2.0, s*1.7, size*0.06);
+      ictx.fillStyle = accent; ictx.fill();
+      ictx.strokeStyle = '#eafcff'; ictx.lineWidth = size*0.045; ictx.stroke();
+      ictx.fillStyle = '#0a1a20';
+      roundRect(ictx, -s*0.16, -s*0.55, s*0.32, s*1.1, size*0.02); ictx.fill();
+      roundRect(ictx, -s*0.55, -s*0.16, s*1.1, s*0.32, size*0.02); ictx.fill();
+      break;
+    }
+    default: {
+      ictx.beginPath(); ictx.arc(0,0,s*0.6,0,Math.PI*2); ictx.stroke();
+    }
+  }
+  ictx.restore();
 }
 
 function pickUpgrade(i){
